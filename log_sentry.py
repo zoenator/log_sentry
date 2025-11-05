@@ -1,5 +1,6 @@
 import sys
 import re
+import copy
 from pathlib import Path 
 from collections import Counter
 
@@ -49,7 +50,7 @@ def parse_log_file(log_file: Path):
         # ...
     }
 
-    findings_counter = findings.copy()
+    findings_counter = copy.deepcopy(findings)
 
     line_count = 0
 
@@ -61,7 +62,7 @@ def parse_log_file(log_file: Path):
                 line_count += 1
                 for key_name, regex_pattern in SECURITY_KEYWORDS.items():
 
-                    if re.search(regex_pattern, line):
+                    if re.search(regex_pattern, line, re.IGNORECASE):
                         
                         ip_match = re.search(IP_REGEX, line)
                         if ip_match:
@@ -77,6 +78,7 @@ def parse_log_file(log_file: Path):
         print(f"[ERROR] Couldn't read log file {log_file}")
         print(f"        Try with permissions: 'sudo chmod 644 {log_file}'")
         print(f"        Error: {e}")
+        sys.exit(1)
 
     except Exception as e:
     
@@ -112,7 +114,8 @@ def print_report(findings, findings_counter):
     if total_alerts == 0:
         
         print("\n[+] No suspicious keywords found.")
-        print("--------------------------------")
+    
+    print("--------------------------------")
 
 # ---- Main function ----
 
