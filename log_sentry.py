@@ -1,6 +1,7 @@
 import sys
-from pathlib import Path 
 import re
+from pathlib import Path 
+from collections import Counter
 
 # ---- Mapping, globals, structs ----
 
@@ -38,14 +39,92 @@ def get_log_file() -> Path:
     print(f"[*] Input validated.")
     return log_file
 
+def parse_log_file(log_file: Path):
+
+    findings = {
+        "failed_pw": [],
+        "invalid_user": [],
+        "session_opened": [],
+        "ssh_disconnect": [],
+        # ...
+    }
+
+    findings_counter = findings.copy()
+
+    line_count = 0
+
+    try:
+    
+        with log_file.open('r', encoding='utf-8') as f:
+            for line in f:
+                
+                line_count += 1
+                for key_name, regex_pattern in SECURITY_KEYWORDS.items():
+
+                    if re.search(regex_pattern, line):
+                        
+                        ip_match = re.search(IP_REGEX, line)
+                        if ip_match:
+                            
+                            ip = ip_match.group(0)
+                            findings[key_name].append(ip)
+                        else:
+
+                            findings_counter[key_name].append(1)    # append 1 if no ip is found
+
+    except (IOError, PermissionError) as e:
+    
+        print(f"[ERROR] Couldn't read log file {log_file}")
+        print(f"        Try with permissions: 'sudo chmod 644 {log_file}'")
+        print(f"        Error: {e}")
+
+    except Exception as e:
+    
+        print(f"[FATAL ERROR] Unexcpected crash while parsing of line {line_count}: {e}")
+        sys.exit(1)
+
+    print(f"[*] Scan finished. {line_count} lines analyzed.")
+    return findings, findings_counter
+
+def print_report(findings, findings_counter):
+    
+    print("\n--- Log-sentry Report ---")
+    total_alerts = 0
+
+    for key_name in findings:
+        ips_found = findings[key_name]
+        simple_counts = findings_counter[key_name]
+
+        total_ips = len(ips_found)
+        total_simple = len(simple_counts)
+
+        if total_ips > 0 or total_simple > 0:
+
+            print(f"\n[!] Alert-Type: '{key_name}' (Total: {total_ips + total_simple})")
+            total_alerts += (total_ips + total_simple)
+
+            if total_ips > 0:
+
+                ip_counts = Counter(ips_found)
+                for ip, count in ip_counts.items():
+                    print(f"    -IP: {ip} (Count: {count})")
+
+    if total_alerts == 0:
+        
+        print("\n[+] No suspicious keywords found.")
+        print("--------------------------------")
+
 # ---- Main function ----
 
 def main():
 
     log_file = get_log_file()
 
-    print(f"[*] Starting log-scan of {log_file}")
-    # main logic
+    print(f"[*] Starting log-scan of {log_file.name}")
+    
+    findings, findings_counter =  parse_log_file(log_file)
+    print_report(findings, findings_counter)
+
     print("[*] Log-sentry-job complete.")
 
 
