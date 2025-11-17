@@ -1,0 +1,6 @@
+{
+    "failed_pw": "failed password for",
+    "invalid_user": "invalid user",
+    "session_opened": "session opened for user",
+    "ssh_disconnect": "received disconnect from"    
+}

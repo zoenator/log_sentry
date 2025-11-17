@@ -1,6 +1,7 @@
 import sys
 import re
 import copy
+import json
 from pathlib import Path 
 from collections import Counter
 
@@ -9,14 +10,16 @@ from collections import Counter
 # regular expression for ip structure
 IP_REGEX = r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b'
 
-#keywords to scan the log for
-SECURITY_KEYWORDS = {
-    "failed_pw": r'failed password for',
-    "invalid_user": r'invalid user',
-    "session_opened": r'session opened for user',
-    "ssh_disconnect": r'received disconnect from',
-    #.... expandable if necessary
-}
+# load security keywords from config.json
+try:
+    with open('config.json', 'r', encoding='utf-8') as f:
+        SECURITY_KEYWORDS = json.load(f)
+except FileNotFoundError:
+    print("Error: config.json not found. Please make sure its in the same directory as log_sentry.py")
+    sys.exit(1)
+except json.JSONDecodeError:
+    print("Error: Could not decode config.json. Please check JSON for syntax errors.")
+    sys.exit(1)
 
 # ---- helper functions ----
 
