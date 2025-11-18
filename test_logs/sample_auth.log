@@ -5,3 +5,10 @@ Nov 5 10:22:00 Zoe sshd[1236]: received disconnect from 192.168.1.100 port 54321
 Nov 5 10:23:01 Zoe sshd[1237]: invalid user admin from 1.2.3.4 port 12345 ssh2
 Nov 5 10:24:00 Zoe sshd[1238]: session opened for user root by (uid=0)
 Nov 5 10:25:01 Zoe sshd[1239]: failed password for root from 10.0.0.1 port 12345 ssh2
+Nov 18 10:00:00 server sshd[1234]: failed password for root from 8.8.8.8 port 12345 ssh2
+Nov 18 10:00:01 server sshd[1235]: failed password for invalid user admin from 1.1.1.1 port 54321 ssh2
+Nov 18 10:00:02 server sshd[1236]: received disconnect from 208.67.222.222 port 22: 11: Bye Bye
+Nov 18 10:00:03 server sshd[1237]: failed password for root from 8.8.8.8 port 12346 ssh2
+Nov 18 10:00:04 server sshd[1238]: received disconnect from 192.168.1.100 port 5555: 11: Normal Shutdown
+Nov 18 10:00:05 server sshd[1239]: session opened for user denisb by (uid=0)
+Nov 18 10:00:06 server sshd[1240]: invalid user guest from 10.0.0.5
