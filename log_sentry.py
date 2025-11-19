@@ -34,25 +34,34 @@ def get_hostname_from_ip(ip: str) -> str:
         return "(no hostname found)"
 
 
-def get_log_file() -> Path:
+def get_log_files() -> Path:
 # Validates the command-line arg and returns Path object for log file
     print("[*] Validating input file...")
 
-    try: 
-        log_file_path = sys.argv[1]
-    except IndexError:
-        print("Error: Please specify a log file.")
-        print(f"Usage: python3 {sys.argv[0]} <filepath>")
-        sys.exit(1)
+    if len(sys.argv) < 2:                                                                                                                                                  
+        print("Error: Please specify at least one log file.")                                                                                                              
+        print(f"Usage: python3 {sys.argv[0]} <filepath1> <filepath2> ...")                                                                                                 
+        sys.exit(1) 
 
-    log_file = Path(log_file_path).expanduser()         # expanduser to decipher '~' to home directory
+    log_files = []
+    for file in sys.argv[1:]:
 
-    if not log_file.is_file():
-        print(f"{log_file} does not exist or is not a file")
+        log_file = Path(file).expanduser()         # expanduser to decipher '~' to home directory
+        
+        if log_file.is_file():
+            log_files.append(log_file)
+            print(f"[*] Found valid log file: {log_file}")
+        else:
+            print(f"[Warning] '{log_file}' doesn not exist or is not a file. Skipping...")
+        
+
+    if not log_files:
+        print("Error: no valid log files found to analyze.")
         sys.exit(1)
     
-    print(f"[*] Input validated.")
-    return log_file
+    
+    print(f"[*] Input validated. Found {len(log_files)} valid log files")
+    return log_files
 
 def parse_log_file(log_file: Path):
 # Parses log file looking out for the keywords from config.json
@@ -138,12 +147,14 @@ def print_report(findings, findings_counter):
 
 def main():
 
-    log_file = get_log_file()
+    log_files = get_log_files()
 
-    print(f"[*] Starting log-scan of {log_file.name}")
-    
-    findings, findings_counter =  parse_log_file(log_file)
-    print_report(findings, findings_counter)
+    for log_file in log_files:
+
+        print(f"[*] Starting log-scan of {log_file.name}")
+        
+        findings, findings_counter =  parse_log_file(log_file)
+        print_report(findings, findings_counter)
 
     print("[*] Log-sentry-job complete.")
 
