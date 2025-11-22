@@ -5,6 +5,7 @@ import json
 import socket
 from pathlib import Path 
 from collections import Counter
+import argparse
 
 # ---- Mapping, globals, structs ----
 
@@ -30,8 +31,32 @@ except json.JSONDecodeError:
 # ---- helper functions for ML implementation ----
 
 
-# write baseline into json
+# Check logfile for differences to baseline
+def check_for_anomalies(log_file: Path):
 
+    try:
+        with open('baseline.json', 'r', encoding='utf-8') as f:
+            baseline_profile = json.load(f)
+    except FileNotFoundError:
+            print("Error: baseline.json not found. Please make sure its in the same directory as log_sentry.py")
+            sys.exit(1)
+    except json.JSONDecodeError:
+            print("Error: Could not decode baseline.json. Please check JSON for syntax errors.")
+            sys.exit(1)
+
+    log_profile = create_log_profile(log_file)
+
+    for key, value in log_profile.items():
+        if key not in baseline_profile:
+            print(f"[Warning] Anomaly found: New Pattern in {log_file}: {key} (Count:{value})")
+        else:
+            baseline_occurence = baseline_profile[key]
+            if baseline_occurence * 2 < value:    
+                print(f"[Warning] Anomaly found: Frequency deviation in {log_file}: {key} (Count: {value}, Baseline occurence: {baseline_occurence})")
+
+
+
+# write baseline into json
 def baseline_to_json(baseline):
     
     try:
@@ -42,12 +67,7 @@ def baseline_to_json(baseline):
         sys.exit(1)
     
 
-
-
-# mask whole log file
-def generate_baseline(log_file: Path):
-    
-
+def create_log_profile(log_file: Path):
     masked_lines_list = []
     line_count = 0
 
@@ -74,6 +94,12 @@ def generate_baseline(log_file: Path):
 
     findings = Counter(masked_lines_list)
     print(f"[*] Scan finished. {line_count} lines analyzed.")
+    return findings
+
+# mask whole log file
+def generate_baseline(log_file: Path):
+    
+    findings = create_log_profile(log_file)
     baseline_to_json(findings)
     
 
@@ -100,34 +126,26 @@ def get_hostname_from_ip(ip: str) -> str:
         return "(no hostname found)"
 
 
-def get_log_files() -> Path:
-# Validates the command-line arg and returns Path object for log file
-    print("[*] Validating input file...")
-
-    if len(sys.argv) < 2:                                                                                                                                                  
-        print("Error: Please specify at least one log file.")                                                                                                              
-        print(f"Usage: python3 {sys.argv[0]} <filepath1> <filepath2> ...")                                                                                                 
-        sys.exit(1) 
-
-    log_files = []
-    for file in sys.argv[1:]:
-
-        log_file = Path(file).expanduser()         # expanduser to decipher '~' to home directory
-        
-        if log_file.is_file():
-            log_files.append(log_file)
-            print(f"[*] Found valid log file: {log_file}")
-        else:
-            print(f"[Warning] '{log_file}' doesn not exist or is not a file. Skipping...")
-        
-
-    if not log_files:
-        print("Error: no valid log files found to analyze.")
-        sys.exit(1)
-    
-    
-    print(f"[*] Input validated. Found {len(log_files)} valid log files")
-    return log_files
+def process_file_paths(path_strings: list[str]) -> list[Path]:                                                                                                                 
+    # Validate strings and return path object                                                                                                
+    print("[*] Validating input files...")                                                                                                                                     
+    valid_paths = []                                                                                                                                                           
+    if not path_strings:                                                                                                                                                       
+        print("[Warning] No file paths provided.")                                                                                                                             
+        return []                                                                                                                                                              
+                                                                                                                                                                            
+    for path_str in path_strings:                                                                                                                                              
+        log_file = Path(path_str).expanduser()                                                                                                                                 
+        if log_file.is_file():                                                                                                                                                 
+            valid_paths.append(log_file)                                                                                                                                       
+            print(f"[*] Found valid log file: {log_file}")                                                                                                                     
+        else:                                                                                                                                                                  
+            print(f"[Warning] '{log_file}' does not exist or is not a file. Skipping...")                                                                                      
+                                                                                                                                                                            
+    if not valid_paths:                                                                                                                                                        
+        print("[Error] No valid log files found to analyze.")                                                                                                                  
+                                                                                                                                                                            
+    return valid_paths  
 
 def parse_log_file(log_file: Path):
 # Parses log file looking out for the keywords from config.json
@@ -212,18 +230,49 @@ def print_report(findings, findings_counter):
 # ---- Main function ----
 
 def main():
+    parser = argparse.ArgumentParser(
+        description="Log-Sentry - A log analysis tool.",
+        epilog="Example: python3 log_sentry.py --check-anomalies <path>"
+    )
 
-    log_files = get_log_files()
+    mode_group =  parser.add_mutually_exclusive_group()
 
-    for log_file in log_files:
+    # Option 1: create baseline
+    mode_group.add_argument('--create-baseline', dest = 'baseline_file',
+                            metavar='FILE', help='Create a new Baseline from the given log file.')
+    # Option 2: Check anomalies
+    mode_group.add_argument('--check-anomalies', dest = 'log_files', nargs='*',
+                            metavar='FILE', help='Compare a log file to baseline.')
+    # Option 3: Check keywords
+    mode_group.add_argument('--check-keywords', dest = 'keyword_file', nargs='*',
+                            metavar='FILE', help='Log file(s) to scan for keywords.')
+    args = parser.parse_args()
 
-        print(f"[*] Starting log-scan of {log_file.name}")
-        
-        findings, findings_counter =  parse_log_file(log_file)
-        print_report(findings, findings_counter)
+    if args.baseline_file:
+        log_file = Path(args.baseline_file)
+        if log_file.is_file():
+            print(f"[*] Mode: Create Baseline from {args.baseline_file}")
+            generate_baseline(log_file)
+            print("[*] Log-sentry-job complete.")
+        else:
+            print(f"[ERROR] File not found: {log_file}")
+    elif args.log_files:
+        log_files = process_file_paths(args.log_files)
+        for log_file in log_files:
+            print(f"[*] Mode: Check for anomalies in {log_file}")
+            check_for_anomalies(log_file)
+        print("[*] Log-sentry-job complete.")
+    elif args.keyword_file:
+        log_files = process_file_paths(args.keyword_file)
+        for log_file in log_files:
+            print(f"[*] Starting log-scan of {log_file.name}")
+            findings, findings_counter =  parse_log_file(log_file)
+            print_report(findings, findings_counter)
 
-    print("[*] Log-sentry-job complete.")
-
+        print("[*] Log-sentry-job complete.")
+    else:
+        print("[*] No log file specified. Showing help.")
+        parser.print_help()
 
 
 if __name__ == "__main__":
