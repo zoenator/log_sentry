@@ -10,6 +10,10 @@ from collections import Counter
 
 # Regex to identify and extract IPv4 addresses from log lines
 IP_REGEX = r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b'
+TIME_REGEX = r'[A-Za-z]{3}\s+\d{1,2}\s+(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d'
+NUM_REGEX = r'\d+'
+
+
 
 # Load security keywords from an external config file                                                                                                               │ 
 # This allows modifying search patterns without changing the code
@@ -23,7 +27,69 @@ except json.JSONDecodeError:
     print("Error: Could not decode config.json. Please check JSON for syntax errors.")
     sys.exit(1)
 
-# ---- helper functions ----
+# ---- helper functions for ML implementation ----
+
+
+# write baseline into json
+
+def baseline_to_json(baseline):
+    
+    try:
+        with open('baseline.json', 'w') as file:
+            json.dump(baseline, file, indent=4)
+    except PermissionError:
+        print("Error: baseline.json not found. Please make sure its in the same directory as log_sentry.py")
+        sys.exit(1)
+    
+
+
+
+# mask whole log file
+def generate_baseline(log_file: Path):
+    
+
+    masked_lines_list = []
+    line_count = 0
+
+    try:
+        # open log file
+        with log_file.open('r', encoding='utf-8') as f:
+            for line in f:
+                # Iterate through log file
+                masked_line = mask_log_line(line)
+                masked_lines_list.append(masked_line)
+                line_count += 1
+                
+    except (IOError, PermissionError) as e:
+    
+        print(f"[ERROR] Couldn't read log file {log_file}")
+        print(f"        Try with permissions: 'sudo chmod 644 {log_file}'")
+        print(f"        Error: {e}")
+        sys.exit(1)
+
+    except Exception as e:
+    
+        print(f"[FATAL ERROR] Unexcpected crash while parsing of line {line_count}: {e}")
+        sys.exit(1)
+
+    findings = Counter(masked_lines_list)
+    print(f"[*] Scan finished. {line_count} lines analyzed.")
+    baseline_to_json(findings)
+    
+
+
+
+
+# mask 1 line
+def mask_log_line(line: str) -> str:
+    # turns 1 line into masked line
+    modified_line = re.sub(TIME_REGEX, "<TIMESTAMP>", line)
+    modified_line = re.sub(IP_REGEX, "<IP>",modified_line)
+    modified_line = re.sub(NUM_REGEX, "<NUM>", modified_line)
+    
+    return modified_line
+
+# ---- Key-word helper functions ----
 
 def get_hostname_from_ip(ip: str) -> str:
 # Performs a reverse DNS lookup to find the hostname for an IP
